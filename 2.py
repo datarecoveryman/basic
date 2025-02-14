@@ -13,7 +13,7 @@ def do_command(line):
     elif line == "list!":
         print("Listing program lines:")
         for key in sorted(lines_dict.keys()):
-            print(str(key) + " " + lines_dict[key])
+            print(str(key) + ": " + lines_dict[key])
         return True
     elif line == "line!" or line == "next!":
         print("Next line number: " + str(next_line_number))
@@ -48,5 +48,5 @@ while True:
     else:
         remaining = line
     lines_dict[next_line_number] = remaining
-    print("Stored line: " + str(next_line_number) + " " + remaining)
+    print("Stored line " + str(next_line_number) + ": " + remaining)
     next_line_number += 10
