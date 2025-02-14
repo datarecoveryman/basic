@@ -11,7 +11,7 @@ type Program = Map.Map LineNumber LineCode
 
 -- Example program
 exampleProgram :: Program
-exampleProgram = Map.fromList [(1, "print 'Hello, World!'"), (2, "print 'Goodbye!'")]
+exampleProgram = Map.fromList [(10, "print 'Hello, World!'"), (20, "print 'Goodbye!'")]
 
 
 print_lines :: [String] -> IO ()
@@ -37,6 +37,12 @@ program_strings_sorted p = "Listing program lines: " : lines_sorted
         lineString :: (LineNumber, LineCode) -> String
         lineString (k, v) = show k ++ ": " ++ v
 
+read_line_number :: LineNumber -> [String] -> LineNumber
+read_line_number fallback_number tokens =
+    if null tokens
+        then fallback_number
+        else read (head tokens)
+
 handle_line :: LineNumber -> Program -> IO ()
 handle_line next_line_number lines = do
     -- prompt the user for a string
@@ -48,20 +54,31 @@ handle_line next_line_number lines = do
     if null tokens
         then handle_line next_line_number lines
         else case head tokens of
-            "exit!" -> putStrLn "Goodbye!"
-            "quit!" -> putStrLn "Goodbye!"
+            "exit!" -> return () --putStrLn "Goodbye!"
+            "quit!" -> return () --putStrLn "Goodbye!"
             "help!" -> do
                 putStrLn "Available commands: exit!, help!, list!, line!, next!, run!"
                 do_nothing
             "list!" -> do
-                print_lines $ program_to_strings lines
+                --print_lines $ program_to_strings lines
+                print_lines $ program_strings_sorted lines
+                do_nothing
+            "next!" -> do
+                putStrLn $ "Next line number: " ++ (show next_line_number)
                 do_nothing
             "run!" -> do
                 putStrLn "TODO: implement run!"
                 do_nothing
             _ -> do
-                let new_lines = Map.insert next_line_number line lines
-                handle_line (next_line_number + 10) new_lines
+                --putStrLn "About to add a line; use the line number, if given."
+                let line_words = words line
+                --putStrLn (show line_words)
+                let line_number = read_line_number (next_line_number + 10) line_words
+                --putStrLn $ "Line number: " ++ (show line_number)
+                let line_remaining = unwords (tail line_words)
+                let new_lines = Map.insert line_number line_remaining lines
+                putStrLn $ "Stored line " ++ (show line_number) ++ ": " ++ line_remaining
+                handle_line (line_number + 10) new_lines
     where
         do_nothing = handle_line next_line_number lines
 
