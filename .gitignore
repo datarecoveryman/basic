@@ -25,3 +25,4 @@ cabal.project.local~
 # Just manually ignore the compiled files
 /hs-map
 /hs-list
+/hs-interp

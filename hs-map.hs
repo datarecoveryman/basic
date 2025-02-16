@@ -1,6 +1,7 @@
 module Main where
 
 import System.IO (hFlush, stdout)
+import System.Process (callCommand)
 import qualified Data.Map as Map
 
 type LineNumber = Integer
@@ -56,8 +57,14 @@ handle_line next_line_number lines = do
         else case head tokens of
             "exit!" -> return () --putStrLn "Goodbye!"
             "quit!" -> return () --putStrLn "Goodbye!"
+            "clear!" -> do
+                callCommand "clear"
+                do_nothing
+            "cls!" -> do
+                callCommand "clear"
+                do_nothing
             "help!" -> do
-                putStrLn "Available commands: exit!, help!, list!, line!, next!, run!"
+                putStrLn "Available commands: cls!, exit!, help!, list!, line!, next!, run!"
                 do_nothing
             "list!" -> do
                 --print_lines $ program_to_strings lines
