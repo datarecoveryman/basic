@@ -31,12 +31,7 @@ class TokenStream:
     
     def all(self): # Return all tokens
         self.reset()
-        tokens = []
-        token = self.next()
-        while token is not None:
-            tokens.append(token)
-            token = self.next()
-        return tokens
+        return self.remaining()
     
     def next(self): # Return next token
         # Skip whitespace
@@ -72,6 +67,15 @@ class TokenStream:
             return self.expr[self.idx]
         return None
     
+    def remaining(self): # Return tokens after the current position
+        tokens = []
+        token = self.next()
+        while token is not None:
+            tokens.append(token)
+            token = self.next()
+        # Unexpected mutation: self.reset()
+        return tokens
+
     def take_delim(self): # Read a single delimiter
         delim = self.peek()
         self.idx += 1
@@ -89,10 +93,10 @@ class TokenStream:
         while self.peek() is not None and self.peek().isdigit():
             num += self.peek()
             self.idx += 1
-        return TokenNumber(int(num), num)
+        return TokenNumber(int(num), num) if len(num) else None
     def take_number2(self):
         num = self.take_lambda(lambda c: c.isdigit())
-        return TokenNumber(int(num), num)
+        return TokenNumber(int(num), num) if len(num) else None
 
     def take_operator(self): # Read a (multi-character) operator
         ops = ""
