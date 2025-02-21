@@ -67,6 +67,13 @@ class TokenStream:
             return self.expr[self.idx]
         return None
     
+    def skip_whitespace(self): # When sitting on whitespace, skip forward to the first non-whitespace
+        if self.peek() is None or self.peek() not in " \t\n\r":
+            raise ValueError("Cannot call skip_whitespace when not on whitespace.")
+        while self.peek() is not None and self.peek() in " \t\n\r":
+            self.idx += 1
+        return self.peek()
+
     def remaining(self): # Return tokens after the current position
         tokens = []
         token = self.next()

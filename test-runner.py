@@ -4,18 +4,23 @@ import TokenStream
 import Runner
 
 #+ "50 LET Y = Y + 1\n" \ # Requires expression support
-test_program_1 = "20 LET X = 10\n" \
-    + "10 LET Y = X\n" \
-    + "30 REM allow anything valid 123456\n" \
-    + "40 PRINT Y\n" \
-    + "50 LET Y = 20\n" \
-    + "60 GOTO 40\n"
+# Flipping 10 and 20 correctly fails due to undefined X.
+test_program_1 = "10 LET X = 100\n" \
+    + "20 LET Y = 777\n" \
+    + "40 REM comment\n" \
+    + "60 PRINT Y\n" \
+    + "80 LET Y = Q + 10\n" \
+    + "99 GOTO 60\n"
+
+test_program_2 = "10 LET X = 100\n" \
+    + "20 LET Y = X * 4\n"
+
 print("Test program:")
-print(test_program_1.strip())
+print(test_program_2.strip())
 print("")
 
 print("Break program into statements:")
-ts = TokenStream.TokenStream(test_program_1)
+ts = TokenStream.TokenStream(test_program_2)
 p = Parser.Parser(ts)
 statements = p.all()
 for statement in statements:

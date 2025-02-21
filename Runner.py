@@ -26,20 +26,30 @@ class Runner:
         ln, stmt = p
         print(f"Execute line {ln}: {stmt}")
         if isinstance(stmt, Parser.CodeAssignment):
-            print("Assignment")
-            self.vars_dict[stmt.var] = stmt.expr
+            if isinstance(stmt.expr, Parser.Expression):
+                expr_value = stmt.expr.get_value(self.vars_dict)
+                #print(f"Expression value: {expr_value}")
+                self.vars_dict[stmt.var] = expr_value
+            else:
+                #print(f"Setting {stmt.var} to literal {stmt.expr}")
+                self.vars_dict[stmt.var] = stmt.expr.value
+            print(f"Assignment: set {stmt.var} to {self.vars_dict[stmt.var]}")
         elif isinstance(stmt, Parser.CodeGoto):
-            print("Goto", stmt.target)
+            print("GOTO", stmt.target)
             if stmt.target not in self.line_numbers:
                 print(f"Line {stmt.target} not found.")
                 return False
-            self.idx = self.line_numbers.index(stmt.target)
+            # if idx is going to be incremented later, can I just subtract 1 here?
+            self.idx = self.line_numbers.index(stmt.target) - 1
         elif isinstance(stmt, Parser.CodeNoop):
-            print("Noop")
+            print("REM Noop")
             pass
         elif isinstance(stmt, Parser.CodePrint):
-            print("Print")
-            print(stmt.expr)
+            if isinstance(stmt.expr, Parser.Expression):
+                expr_value = stmt.expr.get_value(self.vars_dict)
+                print(f"PRINT expression: {expr_value}")
+            else:
+                print(f"PRINT literal {stmt.expr}: {stmt.expr.value}")
         else:
             print("Unknown statement type:", stmt)
         self.idx += 1
