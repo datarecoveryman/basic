@@ -85,11 +85,16 @@ class Expression:
 
 class ParserFF:
     # This is a "fast forward" parser. (Copilot said this)
-    def __init__(self, token_stream):
+    def __init__(self, token_stream, debug=False):
         if not isinstance(token_stream, TokenStream.TokenStreamSkippy):
             raise Exception("Expected TokenStreamSkippy")
         self.tokens = token_stream
+        self.debug = debug # Show the debug print()s
 
+    def _debug_print(self, *msg):
+        if self.debug:
+            print(*msg)
+    
     def all(self):
         statements = []
         stmt = self.take_statement()
@@ -107,29 +112,29 @@ class ParserFF:
             # No start, no statement
             return None
         line_number = line_number_token.value
-        print("Line number:", line_number)
+        self._debug_print("Line number:", line_number)
         verb = self.tokens.take_symbol()
         if verb is None:
             raise Exception("Expected verb")
-        print("Verb:", verb)
+        self._debug_print("Verb:", verb)
         code = None
         if verb.value == "GOTO":
             # GOTO 123
             target_line_number = self.tokens.take_number()
             if target_line_number is None:
                 raise Exception("Expected line number after GOTO")
-            print("GOTO line number:", target_line_number)
+            self._debug_print("GOTO line number:", target_line_number)
             code = CodeGoto(line_number, target_line_number)
         elif verb.value == "LET":
             # LET X = 5
             var = self.tokens.take_symbol()
             if var is None:
                 raise Exception("Expected variable after LET")
-            print("LET variable:", var)
+            self._debug_print("LET variable:", var)
             equals = self.tokens.take_operator()
             if equals is None or equals.value != "=":
                 raise Exception("Expected = after variable in LET")
-            print("LET equals:", equals)
+            self._debug_print("LET equals:", equals)
             expr = self.take_expression()
             #expr = self.tokens.take_symbol() # HACK
             code = CodeAssignment(line_number, var.value, expr)
@@ -140,16 +145,24 @@ class ParserFF:
             code = CodePrint(line_number, expr)
         elif verb.value == "REM":
             # REM "my comment"
-            comment = self.tokens.take_string()
-            if comment is None:
+            #comment = self.tokens.take_string() # HACK
+            comment_tokens = self.tokens.take_until_newline()
+            self._debug_print("take_until_newline:", comment_tokens)
+            if comment_tokens is None:
                 raise Exception("Expected string after REM")
-            print("REM comment:", comment)
-            code = CodeNoop(line_number, comment)
+            self._debug_print("REM comment:", comment_tokens)
+            # I don't like putting token/string processing in here.
+            # Leave that to CodeNoop.
+            #words = " ".join([c.original for c in comment_tokens])
+            #self._debug_print("REM words:", words)
+            #code = CodeNoop(line_number, words)
+            code = CodeNoop(line_number, comment_tokens)
         else:
             raise Exception("Unknown verb: " + str(verb))
-        newline = self.tokens.take_newline()
-        if newline is None:
-            raise Exception("Expected trailing newline")
+        if verb.value != "REM":
+            newline = self.tokens.take_newline()
+            if newline is None:
+                raise Exception("Expected trailing newline")
         return code
 
     def take_expression(self):
@@ -167,15 +180,15 @@ class ParserFF:
     
     def parse_primary(self):
         first = self.tokens.skip()
-        print("parse_primary: first:", first)
+        self._debug_print("parse_primary: first:", first)
         # the "primary" in an expression can be a number, a variable,
         # a string, or a parenthesized expression (recursive).
         # But, with multiple options, the "demanding" approach has
         # to be flexible.
         n = self.tokens.next()
-        print("Next token:", n)
+        self._debug_print("Next token:", n)
         if isinstance(n, TokenStream.TokenNumber) or isinstance(n, TokenStream.TokenSymbol):
-            print("parse_primary: number/symbol:", n)
+            self._debug_print("parse_primary: number/symbol:", n)
             return Expression(n)
         if isinstance(n, TokenStream.TokenDelimiter) and n.value == '(':
             expr = self.parse_expression()
@@ -189,13 +202,13 @@ class ParserFF:
         left_expr = self.parse_primary()
         while True:
             # parse_expression() always creates a left_expr, the first term.
-            print(f"left_expr: {left_expr}")
+            self._debug_print(f"left_expr: {left_expr}")
             peek = self.tokens.peek()
-            print(f"peek: {peek}")
+            self._debug_print(f"peek: {peek}")
             if peek is None:
                 raise Exception("Expected operator or newline, got None")
             if peek == "\n":
-               print("parse_expression: found newline, ending expression")
+               self._debug_print("parse_expression: found newline, ending expression")
                break
             op = self.tokens.take_operator()
             if op is None:
@@ -212,7 +225,7 @@ class ParserFF:
             # if not isinstance(op_or_nl, TokenStream.TokenOperator):
             #     print("parse_expression: not an operator, breaking")
             # op = op_or_nl
-            print("parse_expression: operator:", op)
+            self._debug_print("parse_expression: operator:", op)
             op_precedence = self.get_precedence(op)
             if op_precedence < precedence:
                 break
@@ -362,8 +375,9 @@ class Parser:
                 rem_tokens.append(p)
                 p = self.tokens.next()
             # Ignore the rest of the line
-            rem_line = " ".join([str(t.original) for t in rem_tokens])
-            return CodeNoop(p_line_num, rem_line)
+            #rem_line = " ".join([str(t.original) for t in rem_tokens])
+            #return CodeNoop(p_line_num, rem_line)
+            return CodeNoop(p_line_num, rem_tokens)
         raise Exception("Unknown statement: " + str(p))
 
     def take_expression(self, p_line_num):

@@ -26,8 +26,7 @@ class TokenStreamSkippy:
     # It skips leading spaces (non-newline whitespace), but
     # then demands the required token.
 
-    # FASCINATING: I have no idea how to write an all() for this.
-    # This only works when the parser knows what to demand.
+    # TODO: Make the take_ functions even more abstract using take_custom.
 
     def __init__(self, text):
         self.text = text
@@ -68,6 +67,30 @@ class TokenStreamSkippy:
         while self.peek() is not None and self.peek() in self.spaces:
             self.idx += 1
         return self.peek()
+
+    def take_until_newline(self): # Read <not newlines> until the end of the line
+        # Intended for reading everything after a REM,
+        # even an empty REM would still have the trailing newline.
+        # Because this returns the consumed tokens, it also has to
+        # consume the newline.
+        n = self.next()
+        if n is None:
+            return None # must have trailing newline
+        tokens = []
+        while n is not None and not isinstance(n, TokenNewline):
+            tokens.append(n)
+            n = self.next()
+        if n is None:
+            raise ValueError("Unterminated line")
+        return tokens
+    
+    # TODO: Test
+    def take_custom(self, fn_pred, fn_build):
+        self.skip()
+        if self.peek() is None or not fn_pred(self.peek()):
+            return None
+        foo = self.take_lambda(fn_pred)
+        return fn_build(foo)
 
     def take_alpha(self):
         self.skip()

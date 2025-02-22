@@ -2,6 +2,36 @@
 import Parser
 import TokenStream
 
+def run_test(program, new_parser=True, granular=True):
+    print("Test program:")
+    print(program.strip())
+    print("")
+
+    print("Create token stream and parser...")
+    if new_parser:
+        ts = TokenStream.TokenStreamSkippy(program)
+        p = Parser.ParserFF(ts, debug=False)
+    else:
+        ts = TokenStream.TokenStream(program)
+        p = Parser.Parser(ts)
+    print("")
+
+    print("Parse the program into statements:")
+    print("(Note: the line numbers are not sorted by Parser.)")
+    print("")
+    if granular: # Granular
+        stmt = p.take_statement()
+        while stmt is not None:
+            print("Statement:", stmt)
+            print("")
+            stmt = p.take_statement()
+    else:
+        # all() won't get them as it parses if it crashes.
+        print("Statements:")
+        for statement in p.all():
+            print("Statement:", statement)
+            print("")
+
 def test_generic():
     # Line numbers are mandatory
     test_program_1 = "20 LET Y = X\n" \
@@ -10,44 +40,17 @@ def test_generic():
         + "40 LET X = 40\n" \
         + "50 PRINT Y\n" \
         + "60 GOTO 999\n"
-    print("Test program:")
-    print(test_program_1.strip())
-    print("")
-
-    print("Parse the program into statements:")
-    print("(Note: the line numbers are not sorted by Parser.)")
-    ts = TokenStream.TokenStream(test_program_1)
-    p = Parser.Parser(ts)
-    statements = p.all()
-    for statement in statements:
-        print(statement)
+    run_test(test_program_1)
 
 def test_take_statement():
     program = "10 GOTO 20\n" \
-        + "15 REM \"String comment\"\n" \
         + "20 LET X = 100\n" \
-        + "30 LET Y = X * 4\n"
+        + "30 LET Y = X * 4\n" \
+        + "15 REM \"String comment\"\n"
     #+ "40 PRINT Y\n" \
     #+ "50 GOTO 999\n"
-    print("Test program:")
-    print(program.strip())
-    print("")
-
-    #ts = TokenStream.TokenStream(program)
-    #p = Parser.Parser(ts)
-    ts_skippy = TokenStream.TokenStreamSkippy(program)
-    pff = Parser.ParserFF(ts_skippy)
-    # all() won't get them as it parses if it crashes.
-    #print("Statements:")
-    #for statement in pff.all():
-    #    print("Statement:", statement)
-    #    print("")
-    stmt = pff.take_statement()
-    while stmt is not None:
-        print("Statement:", stmt)
-        print("")
-        stmt = pff.take_statement()
+    run_test(program)
 
 
-#test_generic()
+test_generic()
 test_take_statement()
