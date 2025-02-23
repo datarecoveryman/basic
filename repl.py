@@ -15,7 +15,7 @@ def do_command(lines, all_tokens):
         os.system("cls" if os.name == "nt" else "clear")
         return True
     elif cmd_lower == "help":
-        cmds = ["cls", "exit", "help", "list", "next", "run"]
+        cmds = ["cls", "exit", "help", "list", "run"]
         cmds_bang = [c + "!" for c in cmds]
         print("Available commands: " + ", ".join(cmds_bang))
         return True
@@ -23,10 +23,7 @@ def do_command(lines, all_tokens):
         print("")
         print("Listing program lines:")
         for key in sorted(lines.keys()):
-            #value_line = " ".join([str(t.value) for t in lines[key]])
-            ##original_line = " ".join([str(t.original) for t in lines[key]])
-            #print(str(key) + ": " + value_line)
-            print(f"{key}: {lines[key]}")
+            print(lines[key])
         print("")
         return True
     elif cmd_lower == "run":
