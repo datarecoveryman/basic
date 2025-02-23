@@ -57,12 +57,20 @@ class TokenStreamSkippy:
         if p.upper() in self.var_other:
             return self.take_symbol()
         raise ValueError(f"Unexpected character: {p}")
-        
+    
     def peek(self): # (READ ONLY) View the current character
         if self.idx < len(self.text):
             return self.text[self.idx]
         return None
     
+    def remaining(self): # Return tokens after the current position
+        tokens = []
+        token = self.next()
+        while token is not None:
+            tokens.append(token)
+            token = self.next()
+        return tokens
+
     def skip(self):
         while self.peek() is not None and self.peek() in self.spaces:
             self.idx += 1

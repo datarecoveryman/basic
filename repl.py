@@ -1,9 +1,11 @@
 import os
 
 import Parser
+import Runner
 import TokenStream
 
-def do_command(lines, next_line_number, cmd, ts):
+def do_command(lines, all_tokens):
+    cmd = all_tokens[0]
     cmd_lower = cmd.value.lower()
     if cmd_lower == "exit" or cmd_lower == "quit":
         print("Exiting program")
@@ -13,58 +15,73 @@ def do_command(lines, next_line_number, cmd, ts):
         os.system("cls" if os.name == "nt" else "clear")
         return True
     elif cmd_lower == "help":
-        cmds = ["cls", "exit", "help", "list", "line", "next", "run"]
+        cmds = ["cls", "exit", "help", "list", "next", "run"]
         cmds_bang = [c + "!" for c in cmds]
         print("Available commands: " + ", ".join(cmds_bang))
-        return True
-    elif cmd_lower == "line" or cmd_lower == "next":
-        print("Next line number: " + str(next_line_number))
         return True
     elif cmd_lower == "list":
         print("")
         print("Listing program lines:")
         for key in sorted(lines.keys()):
-            value_line = " ".join([str(t.value) for t in lines[key]])
-            #original_line = " ".join([str(t.original) for t in lines[key]])
-            print(str(key) + ": " + value_line)
+            #value_line = " ".join([str(t.value) for t in lines[key]])
+            ##original_line = " ".join([str(t.original) for t in lines[key]])
+            #print(str(key) + ": " + value_line)
+            print(f"{key}: {lines[key]}")
         print("")
         return True
     elif cmd_lower == "run":
         print("")
-        print("TODO: Running program...")
+        print("Giving lines to Runner...")
+        my_vars = {}
+        my_runner = Runner.Runner(lines.values(), my_vars)
+        print("")
+        print("Running program...")
+        max_ops = 15
+        ops = 0
+        keep_running = my_runner.next()
+        while ops < max_ops and keep_running:
+            ops += 1
+            if ops >= max_ops:
+                print("Max ops reached; stopping Runner early.")
+                break
+            keep_running = my_runner.next()
+        print("Vars:", my_vars)
         print("")
         return True
+    # Everything else should return before here
+    print("Unknown command:", cmd)
     return False
 
 def repl():
     lines = {}
-    next_line_number = 10
     while True:
-        # Get line from user
+        # Get Line from user
         line = input("> ").strip()
         if len(line) == 0:
             continue
-        print("Lexing line:", line)
-        ts = TokenStream.TokenStream(line + "\n")
-        cmd = ts.take_symbol()
-        #print("Cmd:", cmd)
-        #print("Peek:", ts.peek())
-        if cmd is not None and ts.peek() == "!":
-            do_command(lines, next_line_number, cmd, ts)
+        #print("Line:", line)
+        ts1 = TokenStream.TokenStreamSkippy(line + "\n")
+        all_tokens = ts1.remaining()
+        #print("Line Tokens:", all_tokens)
+        #if len(all_tokens) <= 0:
+        #    continue
+        if len(all_tokens) >= 2 and isinstance(all_tokens[0], TokenStream.TokenSymbol) \
+            and isinstance(all_tokens[1], TokenStream.TokenOperator) \
+            and all_tokens[1].value == "!":
+            do_command(lines, all_tokens)
             continue
-        ts.reset()
-        line_number = ts.take_number()
-        if line_number is not None:
-            next_line_number = line_number.value
-            print("Set line number:", next_line_number)
-        tokens = ts.remaining()
-        for t in tokens:
-            print(t)
-        lines[next_line_number] = tokens
-        print("Lines:")
-        for key in sorted(lines.keys()):
-            print(str(key) + ": " + " ".join([str(t.original) for t in lines[key]]))
-        next_line_number += 10
+        # Parse the Line
+        ts2 = TokenStream.TokenStreamSkippy(line + "\n")
+        p = Parser.ParserFF(ts2)
+        try:
+            stmt = p.take_statement()
+            if stmt is None:
+                print("Error parsing statement")
+                continue
+            print("Parsed:\n  ", stmt)
+            lines[stmt.ln] = stmt
+        except Parser.ParserError as e:
+            print("Parser error:", e)
 
 print("Hello. Commands end with ! so try help! or quit! to exit!")
 

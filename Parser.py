@@ -187,6 +187,9 @@ class ParserFF:
         # to be flexible.
         n = self.tokens.next()
         self._debug_print("Next token:", n)
+        if isinstance(n, TokenStream.TokenString):
+            self._debug_print("parse_primary: string:", n)
+            return Expression(n)
         if isinstance(n, TokenStream.TokenNumber) or isinstance(n, TokenStream.TokenSymbol):
             self._debug_print("parse_primary: number/symbol:", n)
             return Expression(n)
