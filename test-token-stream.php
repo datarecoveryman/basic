@@ -17,6 +17,7 @@ foreach ($test_statements as $statement) {
 
     $token = $ts->next();
     while ($token) {
+        //echo "Token = "; var_dump($token);
         echo "  ", $token, "\n";
         $token = $ts->next();
     }

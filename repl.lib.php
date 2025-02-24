@@ -35,13 +35,15 @@ class TokenStreamSkippy {
     private $text;
     private $idx;
     private $operators;
+    private $debug;
     private $delims;
+    private $digits;
     private $spaces;
     private $newlines;
     private $var_first;
     private $var_other;
 
-    public function __construct(string $text) {
+    public function __construct(string $text, $debug = false) {
         $this->text = $text;
         $this->idx = 0;
         $this->operators = ["=", "!", "+", "-", "*", "/", "^", "<", ">", "<=", ">=", "==", "<>"];
@@ -51,10 +53,24 @@ class TokenStreamSkippy {
         $this->newlines = "\n\r";
         $this->var_first = "_ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         $this->var_other = "_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        $this->debug = $debug;
+    }
+
+    protected function _debug_print(string $label, $value) {
+        if ($this->debug) {
+            echo "$label: ";
+            if (is_array($value)) {
+                print_r($value);
+            } else {
+                echo $value;
+            }
+            echo "\n";
+        }
     }
 
     public function next() {
         $p = $this->skip();
+        $this->_debug_print('p', $p);
         if ($p === false) {
             return false;
         }
@@ -102,8 +118,9 @@ class TokenStreamSkippy {
     }
 
     public function skip() {
-        while (strpos($this->spaces, $this->peek()) !== false) {
+        while ($this->peek() !== false && strpos($this->spaces, $this->peek()) !== false) {
             $this->idx++;
+            $this->_debug_print('skip: idx', $this->idx);
         }
         return $this->peek();
     }
@@ -128,9 +145,11 @@ class TokenStreamSkippy {
 
     public function take_number() {
         $test_num = function ($char) {
+            $this->_debug_print('take_number: test_num', $char);
             return strpos($this->digits, $char) !== false;
         };
         $build = function (string $text) {
+            $this->_debug_print('take_number: build', $text);
             return new TokenNumber((int)$text, $text);
         };
         return $this->take_while($test_num, $build);
@@ -183,8 +202,9 @@ class TokenStreamSkippy {
         $token = '';
         while ($this->peek() !== false && $test($this->peek())) {
             $token .= $this->peek();
+            $this->_debug_print('take_while: token', $token);
             $this->idx++;
         }
-        return $token;
+        return $build($token);
     }
 }
