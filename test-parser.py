@@ -23,14 +23,14 @@ def run_test(program, new_parser=True, granular=True):
         stmt = p.take_statement()
         while stmt is not None:
             print("Statement:", stmt)
-            print("")
+            #print("")
             stmt = p.take_statement()
     else:
         # all() won't get them as it parses if it crashes.
         print("Statements:")
         for statement in p.all():
             print("Statement:", statement)
-            print("")
+            #print("")
 
 def test_generic():
     # Line numbers are mandatory
@@ -50,7 +50,6 @@ def test_take_statement():
     #+ "40 PRINT Y\n" \
     #+ "50 GOTO 999\n"
     run_test(program)
-
 
 test_generic()
 test_take_statement()
