@@ -158,6 +158,20 @@ class ParserFF {
         return $statements;
     }
 
+    public function take_x_or_throw(string $x, Exception $e) {
+        $method = "take_$x";
+        $this->_debug_print("take_x_or_throw: method:", $method);
+        if (!method_exists($this->tokens, $method)) {
+            throw new Exception("Method $method does not exist");
+        }
+        $token = $this->tokens->$method();
+        $this->_debug_print("take_x_or_throw: token:", $token);
+        if ($token === false) {
+            throw $e;
+        }
+        return $token;
+    }
+
     public function take_statement() {
         // Consume one statement's worth of tokens,
         // which is variable, since it depends on the statement.
@@ -169,30 +183,39 @@ class ParserFF {
         }
         $line_number = $line_number_token->value;
         $this->_debug_print("Line number:", $line_number);
-        $verb = $this->tokens->take_symbol();
-        if ($verb === false) {
-            throw new Exception("Expected verb");
-        }
+        //$verb = $this->tokens->take_symbol();
+        //if ($verb === false) {
+        //    throw new Exception("Expected verb");
+        //}
+        $verb = $this->take_x_or_throw('symbol',
+            new Exception("Expected verb after $line_number")
+        );
         $this->_debug_print("Verb:", $verb);
         $code = false;
         if ($verb->value == "GOTO") {
             # GOTO 123
-            $target_line_number = $this->tokens->take_number();
-            if ($target_line_number === false) {
-                throw new Exception("Expected line number after GOTO");
-            }
+            //$target_line_number = $this->tokens->take_number();
+            //if ($target_line_number === false) {
+            //    throw new Exception("Expected line number after GOTO");
+            //}
+            $target_line_number = $this->take_x_or_throw('number',
+                new Exception("Expected line number after GOTO")
+            );
             $this->_debug_print("GOTO line number:", $target_line_number);
             $code = new CodeGoto($line_number, $target_line_number);
         } elseif ($verb->value == "LET") {
             // LET X = 5
-            $var = $this->tokens->take_symbol();
-            if ($var === false) {
-                throw new Exception("Expected variable after LET");
-            }
+            //$var = $this->tokens->take_symbol();
+            //if ($var === false) {
+            //    throw new Exception("Expected variable after LET");
+            //}
+            $var = $this->take_x_or_throw('symbol',
+                new Exception("Expected variable after LET")
+            );
             $this->_debug_print("LET variable:", $var);
             $equals = $this->tokens->take_operator();
             if ($equals === false || $equals->value != "=") {
-                throw new Exception("Expected = after variable in LET");
+                throw new Exception("Expected = after LET {$var->value}");
             }
             $this->_debug_print("LET equals:", $equals);
             $expr = $this->take_expression();
@@ -216,10 +239,13 @@ class ParserFF {
             throw new Exception("Unknown verb: " . (string)$verb);
         }
         if ($verb->value != "REM") {
-            $newline = $this->tokens->take_newline();
-            if ($newline === false) {
-                throw new Exception("Expected trailing newline");
-            }
+            //$newline = $this->tokens->take_newline();
+            //if ($newline === false) {
+            //    throw new Exception("Expected trailing newline");
+            //}
+            $newline = $this->take_x_or_throw('newline',
+                new Exception("Expected trailing newline")
+            );
         }
         return $code;
     }
@@ -228,7 +254,7 @@ class ParserFF {
         return $this->parse_expression();
     }
 
-    public function get_precedence($token) {
+    public function get_precedence(TokenOperator $token) {
         if ($token->value == '+' || $token->value == '-') {
             return 1;
         }
@@ -242,8 +268,8 @@ class ParserFF {
     }
     
     public function parse_primary() {
-        $first = $this->tokens->skip();
-        $this->_debug_print("parse_primary: first:", $first);
+        //$first = $this->tokens->skip();
+        //$this->_debug_print("parse_primary: first:", $first);
         // the "primary" in an expression can be a number, a variable,
         // a string, or a parenthesized expression (recursive).
         // But, with multiple options, the "demanding" approach has
@@ -266,7 +292,8 @@ class ParserFF {
             }
             return $expr;
         }
-        throw new Exception("Unexpected token: " . str($n));
+        //throw new Exception("Unexpected token: " . strval($n));
+        throw new Exception("Expected value or expression, got: " . strval($n));
     }
 
     public function parse_expression($precedence = 0) {
@@ -340,24 +367,18 @@ class TokenStreamSkippy {
     private string $text;
     private int $idx;
     private bool $debug;
-    private readonly array $operators;
-    private readonly string $delims;
-    private readonly string $digits;
-    private readonly string $spaces;
-    private readonly string $newlines;
-    private readonly string $var_first;
-    private readonly string $var_other;
+
+    public const DELIMS = "(),";
+    public const DIGITS = "0123456789";
+    public const NEWLINES = "\n\r";
+    public const OPERATORS = "= ! + - * / ^ < > <= >= == <>";
+    public const SPACES = " \t";
+    public const VAR_FIRST = "_ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    public const VAR_OTHER = "_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
     public function __construct(string $text, $debug = false) {
         $this->text = $text;
         $this->idx = 0;
-        $this->operators = ["=", "!", "+", "-", "*", "/", "^", "<", ">", "<=", ">=", "==", "<>"];
-        $this->delims = "(),";
-        $this->digits = "0123456789";
-        $this->spaces = " \t";
-        $this->newlines = "\n\r";
-        $this->var_first = "_ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        $this->var_other = "_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         $this->debug = $debug;
     }
 
@@ -380,22 +401,22 @@ class TokenStreamSkippy {
             return false;
         }
         // Guess based off the first non-space character
-        if (strpos($this->newlines, $p) !== false) {
+        if (strpos(self::NEWLINES, $p) !== false) {
             return $this->take_newline();
         }
         if ($p === '"') {
             return $this->take_string();
         }
-        if (strpos($this->digits, $p) !== false) {
+        if (strpos(self::DIGITS, $p) !== false) {
             return $this->take_number();
         }
-        if (strpos($this->delims, $p) !== false) {
+        if (strpos(self::DELIMS, $p) !== false) {
             return $this->take_delim();
         }
-        if (in_array($p, $this->operators)) {
+        if (in_array($p, explode(' ', self::OPERATORS))) {
             return $this->take_operator();
         }
-        if (strpos($this->var_first, strtoupper($p)) !== false) {
+        if (strpos(self::VAR_FIRST, strtoupper($p)) !== false) {
             return $this->take_symbol();
         }
         throw new Exception("Unexpected character: $p");
@@ -425,7 +446,7 @@ class TokenStreamSkippy {
     }
 
     public function skip() {
-        while ($this->peek() !== false && strpos($this->spaces, $this->peek()) !== false) {
+        while ($this->peek() !== false && strpos(self::SPACES, $this->peek()) !== false) {
             $this->idx++;
             $this->_debug_print('skip: idx', $this->idx);
         }
@@ -434,7 +455,7 @@ class TokenStreamSkippy {
 
     public function take_delim() {
         $delim = $this->skip();
-        if (strpos($this->delims, $delim) === false) {
+        if (strpos(self::DELIMS, $delim) === false) {
             return false;
         }
         $this->idx++;
@@ -443,7 +464,8 @@ class TokenStreamSkippy {
     
     public function take_newline() {
         $nl = $this->skip();
-        if ($nl !== "\n") {
+        //if ($nl !== "\n")
+        if (strpos(self::NEWLINES, $nl) === false) {
             return false;
         }
         $this->idx++;
@@ -453,7 +475,7 @@ class TokenStreamSkippy {
     public function take_number() {
         $test_num = function ($char) {
             $this->_debug_print('take_number: test_num', $char);
-            return strpos($this->digits, $char) !== false;
+            return strpos(self::DIGITS, $char) !== false;
         };
         $build = function (string $text) {
             $this->_debug_print('take_number: build', $text);
@@ -465,7 +487,7 @@ class TokenStreamSkippy {
     public function take_operator() {
         $test_op = function ($char) {
             //return strpos($this->operators, $char) !== false;
-            return in_array($char, $this->operators);
+            return in_array($char, explode(' ', self::OPERATORS));
         };
         $build = function (string $text) {
             return new TokenOperator($text, $text);
@@ -492,13 +514,28 @@ class TokenStreamSkippy {
     }
 
     public function take_symbol() {
-        $test_sym = function ($char) {
-            return strpos($this->var_other, strtoupper($char)) !== false;
-        };
-        $build = function (string $text) {
-            return new TokenSymbol(strtoupper($text), $text);
-        };
-        return $this->take_while($test_sym, $build);
+        //$test_sym = function ($char) {
+        //    return strpos(self::VAR_OTHER, strtoupper($char)) !== false;
+        //};
+        //$build = function (string $text) {
+        //    return new TokenSymbol(strtoupper($text), $text);
+        //};
+        //return $this->take_while($test_sym, $build);
+        // Take one character from var_first
+        $first = $this->skip();
+        $this->_debug_print('take_symbol: first', $first);
+        if ($first === false || strpos(self::VAR_FIRST, strtoupper($first)) === false) {
+            $this->_debug_print('take_symbol: abandoning after', $first);
+            return false;
+        }
+        $this->idx++;
+        $text = $first;
+        // Take any number of characters from var_other
+        while ($this->peek() !== false && strpos(self::VAR_OTHER, strtoupper($this->peek())) !== false) {
+            $text .= $this->peek();
+            $this->idx++;
+        }
+        return new TokenSymbol(strtoupper($text), $text);
     }
 
     public function take_until_newline() { # Read <not newlines> until the end of the line

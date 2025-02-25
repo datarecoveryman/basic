@@ -16,10 +16,16 @@ function run_test($program, $granular = true, $debug = false) {
     echo "(Note: the line numbers are not sorted by Parser.)\n";
     echo "\n";
     if ($granular) { # Granular
-        $stmt = $parser->take_statement();
-        while ($stmt !== false) {
-            echo "Statement: ", $stmt, "\n";
+        try {
+            // On a parse error, take_statement() throws
+            // an exception with the error message.
             $stmt = $parser->take_statement();
+            while ($stmt !== false) {
+                echo "Statement: ", $stmt, "\n";
+                $stmt = $parser->take_statement();
+            }
+        } catch (Exception $e) {
+            echo "Parse error: ", $e->getMessage(), "\n";
         }
     } else {
         # all() won't get them as it parses if it crashes.
