@@ -10,6 +10,6 @@ Reading from [Wikipedia](https://en.wikipedia.org/wiki/Tiny_BASIC), I think Tiny
 
 TODO:
 * Automated tests, only noisy on error.
-* Expand Python version (if/then, while)
-* PHP version: finish REPL?
-* Haskell version
+* Expand Python version (if/then, while, functions)
+* PHP version: runner, repl
+* Haskell version: everything

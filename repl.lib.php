@@ -133,9 +133,6 @@ class ParserFF {
         if ($this->debug) {
             echo "$label: ";
             if (is_array($msg)) {
-                //foreach ($msg as $m) {
-                //    echo $m . ' ';
-                //}
                 print_r($msg);
             } else {
                 echo is_string($msg) ? "\"$msg\"" : $msg;
@@ -161,21 +158,22 @@ class ParserFF {
         // parse_expression() always creates a left_expr, the first term.
         $left_expr = $this->_parse_primary();
         while (true) {
-            $this->_debug_print("left_expr:", $left_expr);
+            $this->_debug_print("left_expr", $left_expr);
             $peek = $this->tokens->peek();
-            $this->_debug_print("peek:", $peek);
+            //$this->_debug_print("peek", $peek);
             if ($peek === false) {
                 throw new Exception("Expected operator or newline, got None");
             }
-            if ($peek === "\n") {
-                $this->_debug_print("parse_expression: found newline, ending expression", '');
+            if ($peek === "\n") { // Normal end of a single-term expression
+                //$this->_debug_print("parse_expression: found newline, ending expression", '');
                 break;
             }
-            $op = $this->tokens->take_operator();
-            if ($op === false) {
-                throw new Exception("Expected operator, got " . $peek);
-            }
-            $this->_debug_print("parse_expression: operator:", $op);
+            //$op = $this->tokens->take_operator();
+            //if ($op === false) {
+            //    throw new Exception("Expected operator, got " . $peek);
+            //}
+            $op = $this->_take_x_or_throw('operator', "Expected operator, got " . $peek);
+            $this->_debug_print("parse_expression: operator", $op);
             $op_precedence = $this->_get_precedence($op);
             if ($op_precedence < $precedence) {
                 break;
@@ -192,13 +190,13 @@ class ParserFF {
         // But, with multiple options, the "demanding" approach has
         // to be flexible.
         $n = $this->tokens->next();
-        $this->_debug_print("Next token:", $n);
+        $this->_debug_print("Next token", $n);
         if ($n instanceof TokenString) {
-            $this->_debug_print("parse_primary: string:", $n);
+            $this->_debug_print("parse_primary: string", $n);
             return new Expression($n);
         }
         if ($n instanceof TokenNumber || $n instanceof TokenSymbol) {
-            $this->_debug_print("parse_primary: number/symbol:", $n);
+            $this->_debug_print("parse_primary: number/symbol", $n);
             return new Expression($n);
         }
         if ($n instanceof TokenDelimiter && $n->value == '(') {
@@ -213,16 +211,16 @@ class ParserFF {
         throw new Exception("Expected value or expression, got: " . strval($n));
     }
 
-    protected function _take_x_or_throw(string $x, Exception $e) {
+    protected function _take_x_or_throw(string $x, $ex_or_string) {
         $method = "take_$x";
-        $this->_debug_print("take_x_or_throw: method:", $method);
+        //$this->_debug_print("take_x_or_throw: method", $method);
         if (!method_exists($this->tokens, $method)) {
             throw new Exception("Method $method does not exist");
         }
         $token = $this->tokens->$method();
-        $this->_debug_print("take_x_or_throw: token:", $token);
+        //$this->_debug_print("take_x_or_throw: token", $token);
         if ($token === false) {
-            throw $e;
+            throw is_string($ex_or_string) ? new Exception($ex_or_string) : $ex_or_string;
         }
         return $token;
     }
@@ -247,31 +245,26 @@ class ParserFF {
             return false;
         }
         $line_number = $line_number_token->value;
-        $this->_debug_print("Line number:", $line_number);
-        $verb = $this->_take_x_or_throw('symbol',
-            new Exception("Expected verb after $line_number")
-        );
-        $this->_debug_print("Verb:", $verb);
+        $this->_debug_print("Line number", $line_number);
+        $verb = $this->_take_x_or_throw('symbol', "Expected verb after $line_number");
+        $this->_debug_print("Verb", $verb);
         $code = false;
         if ($verb->value == "GOTO") {
             # GOTO 123
-            $target_line_number = $this->_take_x_or_throw('number',
-                new Exception("Expected line number after GOTO")
-            );
-            $this->_debug_print("GOTO line number:", $target_line_number);
+            $target_line_number = $this->_take_x_or_throw('number', "Expected line number after GOTO");
+            $this->_debug_print("GOTO line number", $target_line_number);
             $code = new CodeGoto($line_number, $target_line_number);
         } elseif ($verb->value == "LET") {
             // LET X = 5
-            $var = $this->_take_x_or_throw('symbol',
-                new Exception("Expected variable after LET")
-            );
-            $this->_debug_print("LET variable:", $var);
+            $var = $this->_take_x_or_throw('symbol', "Expected variable after LET");
+            $this->_debug_print("LET variable", $var);
             $equals = $this->tokens->take_operator();
             if ($equals === false || $equals->value != "=") {
                 throw new Exception("Expected = after LET {$var->value}");
             }
-            $this->_debug_print("LET equals:", $equals);
+            //$this->_debug_print("LET equals:", $equals);
             $expr = $this->_parse_expression();
+            $this->_debug_print("LET expression", $expr);
             $code = new CodeAssignment($line_number, $var->value, $expr);
         } elseif ($verb->value == "PRINT") {
             # PRINT "Hello"
@@ -280,21 +273,21 @@ class ParserFF {
         } elseif ($verb->value == "REM") {
             // REM anything "is fine" here
             $comment_tokens = $this->tokens->take_until_newline();
-            //$this->_debug_print("take_until_newline:", $comment_tokens);
             if ($comment_tokens === false) {
                 throw new Exception("Expected string after REM");
             }
-            $this->_debug_print("REM comment:", $comment_tokens);
+            $this->_debug_print("REM comment", $comment_tokens);
             // I don't like putting token/string processing in here.
             // Leave that to CodeNoop.
             $code = new CodeNoop($line_number, $comment_tokens);
-        } else {
+        //} else {
+        //    throw new Exception("Unknown verb: " . (string)$verb);
+        }
+        if ($code === false) {
             throw new Exception("Unknown verb: " . (string)$verb);
         }
         if ($verb->value != "REM") {
-            $newline = $this->_take_x_or_throw('newline',
-                new Exception("Expected trailing newline")
-            );
+            $newline = $this->_take_x_or_throw('newline', "Expected trailing newline");
         }
         return $code;
     }
