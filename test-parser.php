@@ -2,14 +2,14 @@
 
 require_once __DIR__ . '/repl.lib.php';
 
-function run_test($program, $granular = true, $debug = true) {
+function run_test($program, $granular = true, $debug = false) {
     echo "Test program:\n";
     echo rtrim($program) . "\n";
     echo "\n";
 
     echo "Create token stream and parser...\n";
-    $ts = new TokenStreamSkippy($program);
-    $parser = new ParserFF($ts);
+    $ts = new TokenStreamSkippy($program, false && $debug);
+    $parser = new ParserFF($ts, $debug);
     echo "\n";
 
     echo "Parse the program into statements:\n";
@@ -18,16 +18,14 @@ function run_test($program, $granular = true, $debug = true) {
     if ($granular) { # Granular
         $stmt = $parser->take_statement();
         while ($stmt !== false) {
-            echo "Statement:", $stmt, "\n";
-            echo "\n";
+            echo "Statement: ", $stmt, "\n";
             $stmt = $parser->take_statement();
         }
     } else {
         # all() won't get them as it parses if it crashes.
         echo "Statements:\n";
         foreach ($parser->all() as $statement) {
-            echo "Statement:", $statement, "\n";
-            echo "\n";
+            echo "Statement: ", $statement, "\n";
         }
     }
 }

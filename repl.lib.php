@@ -1,8 +1,8 @@
 <?php
 
 abstract class Code {
-    protected $line_number;
-    protected $statement;
+    public readonly int $line_number;
+    //public readonly $statement;
 
     public function __construct($line_number) {
         $this->line_number = $line_number;
@@ -14,8 +14,8 @@ abstract class Code {
 }
 
 class CodeAssignment extends Code {
-    protected $variable;
-    protected $expression;
+    public readonly string $variable;
+    public readonly Expression $expression;
     public function __construct($line_number, $variable, $expression) {
         parent::__construct($line_number);
         $this->variable = $variable;
@@ -27,7 +27,7 @@ class CodeAssignment extends Code {
 }
 
 class CodeGoto extends Code {
-    protected $target;
+    public readonly TokenNumber $target;
     public function __construct($line_number, $target) {
         parent::__construct($line_number);
         $this->target = $target;
@@ -37,8 +37,22 @@ class CodeGoto extends Code {
     }
 }
 
+class CodeNoop extends Code {
+    public readonly array $tokens;
+    public function __construct($line_number, $tokens) {
+        parent::__construct($line_number);
+        $this->tokens = $tokens;
+    }
+    public function __toString() {
+        //return $this->line_number . ':' . get_class($this) . "($this->tokens)";
+        $token_strs = array_map('strval', $this->tokens);
+        $token_str = implode(' ', $token_strs);
+        return $this->line_number . ':' . get_class($this) . "($token_str)";
+    }
+}
+
 class CodePrint extends Code {
-    protected $expression;
+    public readonly Expression $expression;
     public function __construct($line_number, $expression) {
         parent::__construct($line_number);
         $this->expression = $expression;
@@ -49,12 +63,13 @@ class CodePrint extends Code {
 }
 
 class Expression {
-    protected $expr;
+    public $expr;
     public function __construct($expr) {
         $this->expr = $expr;
     }
     public function __toString() {
-        return get_class($this) . "($this->expr)";
+        $expr_str = is_array($this->expr) ? implode(' ', $this->expr) : strval($this->expr);
+        return get_class($this) . "($expr_str)";
     }
     public function get_value($vars_dict) {
         if ($this->expr instanceof TokenNumber) {
@@ -114,10 +129,20 @@ class ParserFF {
         $this->debug = $debug; // Show the debug print()s
     }
 
-    private function _debug_print(...$msg) {
+    private function _debug_print(string $label, $msg) {
         if ($this->debug) {
-            foreach ($msg as $m) {
-                echo $m . " ";
+            echo "$label: ";
+            if (is_array($msg)) {
+                //foreach ($msg as $m) {
+                //    echo $m . ' ';
+                //}
+                print_r($msg);
+            } else {
+                if (is_string($msg)) {
+                    echo '"' . $msg . '" ';
+                } else {
+                    echo $msg . ' ';
+                }
             }
             echo "\n";
         }
@@ -126,7 +151,7 @@ class ParserFF {
     public function all() {
         $statements = [];
         $stmt = $this->take_statement();
-        while ($stmt !== null) {
+        while ($stmt !== false) {
             $statements[] = $stmt;
             $stmt = $this->take_statement();
         }
@@ -138,22 +163,22 @@ class ParserFF {
         // which is variable, since it depends on the statement.
         // General structure: <line number> <verb> <args...> <newline>
         $line_number_token = $this->tokens->take_number();
-        if ($line_number_token === null) {
+        if ($line_number_token === false) {
             // No start, no statement
-            return null;
+            return false;
         }
         $line_number = $line_number_token->value;
         $this->_debug_print("Line number:", $line_number);
         $verb = $this->tokens->take_symbol();
-        if ($verb === null) {
+        if ($verb === false) {
             throw new Exception("Expected verb");
         }
         $this->_debug_print("Verb:", $verb);
-        $code = null;
+        $code = false;
         if ($verb->value == "GOTO") {
             # GOTO 123
             $target_line_number = $this->tokens->take_number();
-            if ($target_line_number === null) {
+            if ($target_line_number === false) {
                 throw new Exception("Expected line number after GOTO");
             }
             $this->_debug_print("GOTO line number:", $target_line_number);
@@ -161,26 +186,26 @@ class ParserFF {
         } elseif ($verb->value == "LET") {
             // LET X = 5
             $var = $this->tokens->take_symbol();
-            if ($var === null) {
+            if ($var === false) {
                 throw new Exception("Expected variable after LET");
             }
             $this->_debug_print("LET variable:", $var);
             $equals = $this->tokens->take_operator();
-            if ($equals === null || $equals->value != "=") {
+            if ($equals === false || $equals->value != "=") {
                 throw new Exception("Expected = after variable in LET");
             }
             $this->_debug_print("LET equals:", $equals);
             $expr = $this->take_expression();
             $code = new CodeAssignment($line_number, $var->value, $expr);
-        } elseif ($verb.value == "PRINT") {
+        } elseif ($verb->value == "PRINT") {
             # PRINT "Hello"
             $expr = $this->take_expression();
             $code = new CodePrint($line_number, $expr);
-        } elseif ($verb.value == "REM") {
+        } elseif ($verb->value == "REM") {
             // REM anything "is fine" here
             $comment_tokens = $this->tokens->take_until_newline();
             $this->_debug_print("take_until_newline:", $comment_tokens);
-            if ($comment_tokens === null) {
+            if ($comment_tokens === false) {
                 throw new Exception("Expected string after REM");
             }
             $this->_debug_print("REM comment:", $comment_tokens);
@@ -192,7 +217,7 @@ class ParserFF {
         }
         if ($verb->value != "REM") {
             $newline = $this->tokens->take_newline();
-            if ($newline === null) {
+            if ($newline === false) {
                 throw new Exception("Expected trailing newline");
             }
         }
@@ -248,21 +273,21 @@ class ParserFF {
         $left_expr = $this->parse_primary();
         while (true) {
             // parse_expression() always creates a left_expr, the first term.
-            $this->_debug_print("left_expr: " . $left_expr);
+            $this->_debug_print("left_expr:", $left_expr);
             $peek = $this->tokens->peek();
-            $this->_debug_print("peek: " . $peek);
-            if ($peek === null) {
+            $this->_debug_print("peek:", $peek);
+            if ($peek === false) {
                 throw new Exception("Expected operator or newline, got None");
             }
             if ($peek === "\n") {
-                $this->_debug_print("parse_expression: found newline, ending expression");
+                $this->_debug_print("parse_expression: found newline, ending expression", '');
                 break;
             }
             $op = $this->tokens->take_operator();
-            if ($op === null) {
+            if ($op === false) {
                 throw new Exception("Expected operator, got " . $peek);
             }
-            $this->_debug_print("parse_expression: operator: " . $op);
+            $this->_debug_print("parse_expression: operator:", $op);
             $op_precedence = $this->get_precedence($op);
             if ($op_precedence < $precedence) {
                 break;
@@ -275,8 +300,8 @@ class ParserFF {
 }
 
 abstract class Token {
-    protected $value;
-    protected $original;
+    public $value;
+    public readonly string $original;
 
     public function __construct($value, $original) {
         $this->value = $value;
@@ -306,16 +331,16 @@ class TokenString extends Token {
 }
 
 class TokenStreamSkippy {
-    private $text;
-    private $idx;
-    private $operators;
-    private $debug;
-    private $delims;
-    private $digits;
-    private $spaces;
-    private $newlines;
-    private $var_first;
-    private $var_other;
+    private string $text;
+    private int $idx;
+    private bool $debug;
+    private readonly array $operators;
+    private readonly string $delims;
+    private readonly string $digits;
+    private readonly string $spaces;
+    private readonly string $newlines;
+    private readonly string $var_first;
+    private readonly string $var_other;
 
     public function __construct(string $text, $debug = false) {
         $this->text = $text;
@@ -344,7 +369,7 @@ class TokenStreamSkippy {
 
     public function next() {
         $p = $this->skip();
-        $this->_debug_print('p', $p);
+        $this->_debug_print('next: p', $p);
         if ($p === false) {
             return false;
         }
@@ -364,7 +389,7 @@ class TokenStreamSkippy {
         if (in_array($p, $this->operators)) {
             return $this->take_operator();
         }
-        if (strpos($this->var_first, $p) !== false) {
+        if (strpos($this->var_first, strtoupper($p)) !== false) {
             return $this->take_symbol();
         }
         throw new Exception("Unexpected character: $p");
@@ -373,6 +398,7 @@ class TokenStreamSkippy {
     public function peek() {
         if ($this->idx < mb_strlen($this->text)) {
             $ret = mb_substr($this->text, $this->idx, 1);
+            //echo "peek ret: "; var_dump($ret);
             if (mb_strlen($ret) < 1) {
                 throw new Exception("Peek expected to be able to return a character; bad idx math?");
             }
@@ -382,6 +408,7 @@ class TokenStreamSkippy {
     }
 
     public function remaining() {
+        throw new Exception('TODO: Find what uses this.');
         $tokens = [];
         $token = $this->next();
         while ($token) {
@@ -460,12 +487,33 @@ class TokenStreamSkippy {
 
     public function take_symbol() {
         $test_sym = function ($char) {
-            return strpos($this->var_other, $char) !== false;
+            return strpos($this->var_other, strtoupper($char)) !== false;
         };
         $build = function (string $text) {
             return new TokenSymbol(strtoupper($text), $text);
         };
         return $this->take_while($test_sym, $build);
+    }
+
+    public function take_until_newline() { # Read <not newlines> until the end of the line
+        # Intended for reading everything after a REM,
+        # even an empty REM would still have the trailing newline.
+        # Because this returns the consumed tokens, it also has to
+        # consume the newline.
+        $n = $this->next();
+        //$this->_debug_print('take_until_newline: n', $n);
+        //if ($n === false) {
+        //    return false; # must have trailing newline
+        //}
+        $tokens = [];
+        while ($n !== false && !($n instanceof TokenNewline)) {
+            $tokens[] = $n;
+            $n = $this->next();
+        }
+        if ($n === false) {
+            throw new Exception("Unterminated line");
+        }
+        return $tokens;
     }
 
     public function take_while($test, $build) {
