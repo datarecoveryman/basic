@@ -138,123 +138,13 @@ class ParserFF {
                 //}
                 print_r($msg);
             } else {
-                if (is_string($msg)) {
-                    echo '"' . $msg . '" ';
-                } else {
-                    echo $msg . ' ';
-                }
+                echo is_string($msg) ? "\"$msg\"" : $msg;
             }
             echo "\n";
         }
     }
     
-    public function all() {
-        $statements = [];
-        $stmt = $this->take_statement();
-        while ($stmt !== false) {
-            $statements[] = $stmt;
-            $stmt = $this->take_statement();
-        }
-        return $statements;
-    }
-
-    public function take_x_or_throw(string $x, Exception $e) {
-        $method = "take_$x";
-        $this->_debug_print("take_x_or_throw: method:", $method);
-        if (!method_exists($this->tokens, $method)) {
-            throw new Exception("Method $method does not exist");
-        }
-        $token = $this->tokens->$method();
-        $this->_debug_print("take_x_or_throw: token:", $token);
-        if ($token === false) {
-            throw $e;
-        }
-        return $token;
-    }
-
-    public function take_statement() {
-        // Consume one statement's worth of tokens,
-        // which is variable, since it depends on the statement.
-        // General structure: <line number> <verb> <args...> <newline>
-        $line_number_token = $this->tokens->take_number();
-        if ($line_number_token === false) {
-            // No start, no statement
-            return false;
-        }
-        $line_number = $line_number_token->value;
-        $this->_debug_print("Line number:", $line_number);
-        //$verb = $this->tokens->take_symbol();
-        //if ($verb === false) {
-        //    throw new Exception("Expected verb");
-        //}
-        $verb = $this->take_x_or_throw('symbol',
-            new Exception("Expected verb after $line_number")
-        );
-        $this->_debug_print("Verb:", $verb);
-        $code = false;
-        if ($verb->value == "GOTO") {
-            # GOTO 123
-            //$target_line_number = $this->tokens->take_number();
-            //if ($target_line_number === false) {
-            //    throw new Exception("Expected line number after GOTO");
-            //}
-            $target_line_number = $this->take_x_or_throw('number',
-                new Exception("Expected line number after GOTO")
-            );
-            $this->_debug_print("GOTO line number:", $target_line_number);
-            $code = new CodeGoto($line_number, $target_line_number);
-        } elseif ($verb->value == "LET") {
-            // LET X = 5
-            //$var = $this->tokens->take_symbol();
-            //if ($var === false) {
-            //    throw new Exception("Expected variable after LET");
-            //}
-            $var = $this->take_x_or_throw('symbol',
-                new Exception("Expected variable after LET")
-            );
-            $this->_debug_print("LET variable:", $var);
-            $equals = $this->tokens->take_operator();
-            if ($equals === false || $equals->value != "=") {
-                throw new Exception("Expected = after LET {$var->value}");
-            }
-            $this->_debug_print("LET equals:", $equals);
-            $expr = $this->take_expression();
-            $code = new CodeAssignment($line_number, $var->value, $expr);
-        } elseif ($verb->value == "PRINT") {
-            # PRINT "Hello"
-            $expr = $this->take_expression();
-            $code = new CodePrint($line_number, $expr);
-        } elseif ($verb->value == "REM") {
-            // REM anything "is fine" here
-            $comment_tokens = $this->tokens->take_until_newline();
-            $this->_debug_print("take_until_newline:", $comment_tokens);
-            if ($comment_tokens === false) {
-                throw new Exception("Expected string after REM");
-            }
-            $this->_debug_print("REM comment:", $comment_tokens);
-            // I don't like putting token/string processing in here.
-            // Leave that to CodeNoop.
-            $code = new CodeNoop($line_number, $comment_tokens);
-        } else {
-            throw new Exception("Unknown verb: " . (string)$verb);
-        }
-        if ($verb->value != "REM") {
-            //$newline = $this->tokens->take_newline();
-            //if ($newline === false) {
-            //    throw new Exception("Expected trailing newline");
-            //}
-            $newline = $this->take_x_or_throw('newline',
-                new Exception("Expected trailing newline")
-            );
-        }
-        return $code;
-    }
-
-    public function take_expression() {
-        return $this->parse_expression();
-    }
-
-    public function get_precedence(TokenOperator $token) {
+    protected function _get_precedence(TokenOperator $token) {
         if ($token->value == '+' || $token->value == '-') {
             return 1;
         }
@@ -266,40 +156,11 @@ class ParserFF {
         }
         return 0;
     }
-    
-    public function parse_primary() {
-        //$first = $this->tokens->skip();
-        //$this->_debug_print("parse_primary: first:", $first);
-        // the "primary" in an expression can be a number, a variable,
-        // a string, or a parenthesized expression (recursive).
-        // But, with multiple options, the "demanding" approach has
-        // to be flexible.
-        $n = $this->tokens->next();
-        $this->_debug_print("Next token:", $n);
-        if ($n instanceof TokenString) {
-            $this->_debug_print("parse_primary: string:", $n);
-            return new Expression($n);
-        }
-        if ($n instanceof TokenNumber || $n instanceof TokenSymbol) {
-            $this->_debug_print("parse_primary: number/symbol:", $n);
-            return new Expression($n);
-        }
-        if ($n instanceof TokenDelimiter && $n->value == '(') {
-            $expr = $this->parse_expression();
-            $closing_paren = $this->tokens->take_delimiter();
-            if (!($closing_paren instanceof TokenDelimiter) || $closing_paren->value != ')') {
-                throw new Exception("Expected closing parenthesis");
-            }
-            return $expr;
-        }
-        //throw new Exception("Unexpected token: " . strval($n));
-        throw new Exception("Expected value or expression, got: " . strval($n));
-    }
 
-    public function parse_expression($precedence = 0) {
-        $left_expr = $this->parse_primary();
+    protected function _parse_expression($precedence = 0) {
+        // parse_expression() always creates a left_expr, the first term.
+        $left_expr = $this->_parse_primary();
         while (true) {
-            // parse_expression() always creates a left_expr, the first term.
             $this->_debug_print("left_expr:", $left_expr);
             $peek = $this->tokens->peek();
             $this->_debug_print("peek:", $peek);
@@ -315,14 +176,127 @@ class ParserFF {
                 throw new Exception("Expected operator, got " . $peek);
             }
             $this->_debug_print("parse_expression: operator:", $op);
-            $op_precedence = $this->get_precedence($op);
+            $op_precedence = $this->_get_precedence($op);
             if ($op_precedence < $precedence) {
                 break;
             }
-            $right_expr = $this->parse_expression($op_precedence + 1);
+            $right_expr = $this->_parse_expression($op_precedence + 1);
             $left_expr = new Expression([$op, $left_expr, $right_expr]);
         }
         return $left_expr;
+    }
+
+    protected function _parse_primary() {
+        // the "primary" in an expression can be a number, a variable,
+        // a string, or a parenthesized expression (recursive).
+        // But, with multiple options, the "demanding" approach has
+        // to be flexible.
+        $n = $this->tokens->next();
+        $this->_debug_print("Next token:", $n);
+        if ($n instanceof TokenString) {
+            $this->_debug_print("parse_primary: string:", $n);
+            return new Expression($n);
+        }
+        if ($n instanceof TokenNumber || $n instanceof TokenSymbol) {
+            $this->_debug_print("parse_primary: number/symbol:", $n);
+            return new Expression($n);
+        }
+        if ($n instanceof TokenDelimiter && $n->value == '(') {
+            $expr = $this->_parse_expression();
+            $closing_paren = $this->tokens->take_delimiter();
+            if (!($closing_paren instanceof TokenDelimiter) || $closing_paren->value != ')') {
+                throw new Exception("Expected closing parenthesis");
+            }
+            return $expr;
+        }
+        //throw new Exception("Unexpected token: " . strval($n));
+        throw new Exception("Expected value or expression, got: " . strval($n));
+    }
+
+    protected function _take_x_or_throw(string $x, Exception $e) {
+        $method = "take_$x";
+        $this->_debug_print("take_x_or_throw: method:", $method);
+        if (!method_exists($this->tokens, $method)) {
+            throw new Exception("Method $method does not exist");
+        }
+        $token = $this->tokens->$method();
+        $this->_debug_print("take_x_or_throw: token:", $token);
+        if ($token === false) {
+            throw $e;
+        }
+        return $token;
+    }
+
+    public function all() {
+        $statements = [];
+        $stmt = $this->take_statement();
+        while ($stmt !== false) {
+            $statements[] = $stmt;
+            $stmt = $this->take_statement();
+        }
+        return $statements;
+    }
+
+    public function take_statement() {
+        // Consume one statement's worth of tokens,
+        // which is variable, since it depends on the statement.
+        // General structure: <line number> <verb> <args...> <newline>
+        $line_number_token = $this->tokens->take_number();
+        if ($line_number_token === false) {
+            // No start, no statement
+            return false;
+        }
+        $line_number = $line_number_token->value;
+        $this->_debug_print("Line number:", $line_number);
+        $verb = $this->_take_x_or_throw('symbol',
+            new Exception("Expected verb after $line_number")
+        );
+        $this->_debug_print("Verb:", $verb);
+        $code = false;
+        if ($verb->value == "GOTO") {
+            # GOTO 123
+            $target_line_number = $this->_take_x_or_throw('number',
+                new Exception("Expected line number after GOTO")
+            );
+            $this->_debug_print("GOTO line number:", $target_line_number);
+            $code = new CodeGoto($line_number, $target_line_number);
+        } elseif ($verb->value == "LET") {
+            // LET X = 5
+            $var = $this->_take_x_or_throw('symbol',
+                new Exception("Expected variable after LET")
+            );
+            $this->_debug_print("LET variable:", $var);
+            $equals = $this->tokens->take_operator();
+            if ($equals === false || $equals->value != "=") {
+                throw new Exception("Expected = after LET {$var->value}");
+            }
+            $this->_debug_print("LET equals:", $equals);
+            $expr = $this->_parse_expression();
+            $code = new CodeAssignment($line_number, $var->value, $expr);
+        } elseif ($verb->value == "PRINT") {
+            # PRINT "Hello"
+            $expr = $this->_parse_expression();
+            $code = new CodePrint($line_number, $expr);
+        } elseif ($verb->value == "REM") {
+            // REM anything "is fine" here
+            $comment_tokens = $this->tokens->take_until_newline();
+            //$this->_debug_print("take_until_newline:", $comment_tokens);
+            if ($comment_tokens === false) {
+                throw new Exception("Expected string after REM");
+            }
+            $this->_debug_print("REM comment:", $comment_tokens);
+            // I don't like putting token/string processing in here.
+            // Leave that to CodeNoop.
+            $code = new CodeNoop($line_number, $comment_tokens);
+        } else {
+            throw new Exception("Unknown verb: " . (string)$verb);
+        }
+        if ($verb->value != "REM") {
+            $newline = $this->_take_x_or_throw('newline',
+                new Exception("Expected trailing newline")
+            );
+        }
+        return $code;
     }
 }
 
