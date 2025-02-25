@@ -310,7 +310,7 @@ abstract class Token {
 
     public function __toString() {
         $value = is_string($this->value) ? '"' . $this->value . '"' : $this->value;
-        return get_class($this) . "($value, $this->original)";
+        return get_class($this) . "($value, \"$this->original\")";
     }
 }
 
@@ -322,10 +322,16 @@ class TokenNewline extends Token {
     }
 }
 class TokenNumber extends Token {
+    public function __toString() {
+        return get_class($this) . "($this->value, \"$this->original\")";
+    }
 }
 class TokenOperator extends Token {
 }
 class TokenSymbol extends Token {
+    public function __toString() {
+        return get_class($this) . "($this->value, \"$this->original\")";
+    }
 }
 class TokenString extends Token {
 }

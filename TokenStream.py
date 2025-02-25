@@ -3,8 +3,9 @@ class Token:
         self.value = value
         self.original = original    
     def __str__(self):
-        value = f"\"{self.value}\"" if isinstance(self.value, str) else self.value
-        return f"{self.__class__.__name__}({value}, \"{self.original}\")"
+        #value = f"\"{self.value}\"" if isinstance(self.value, str) else self.value
+        #return f"{self.__class__.__name__}({value}, \"{self.original}\")"
+        return f"{self.__class__.__name__}(\"{self.value}\", \"{self.original}\")"
     def __repr__(self):
         return str(self)
 class TokenDelimiter(Token):
@@ -13,11 +14,13 @@ class TokenNewline(Token):
     def __str__(self):
         return f"{self.__class__.__name__}()"
 class TokenNumber(Token):
-    pass
+    def __str__(self):
+        return f"{self.__class__.__name__}({self.value}, \"{self.original}\")"
 class TokenOperator(Token):
     pass
 class TokenSymbol(Token):
-    pass
+    def __str__(self):
+        return f"{self.__class__.__name__}({self.value}, \"{self.original}\")"
 class TokenString(Token):
     pass
 
