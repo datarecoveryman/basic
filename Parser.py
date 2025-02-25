@@ -17,34 +17,34 @@ class CodeAssignment(Code):
         self.var = var
         self.expr = expr
     def __str__(self):
-        return f"{self.ln}:Assignment({self.var} <- {self.expr})"
+        return f"{self.ln}:{self.__class__.__name__}({self.var} <- {self.expr})"
 class CodeGoto(Code):
     def __init__(self, line_number, target_line_number):
         super().__init__(line_number)
         self.target = target_line_number
     def __str__(self):
-        return f"{self.ln}:Goto({self.target})"
+        return f"{self.ln}:{self.__class__.__name__}({self.target})"
 class CodeNoop(Code):
     def __init__(self, line_number, comment):
         super().__init__(line_number)
         self.comment = comment
     def __str__(self):
-        return f"{self.ln}:Noop({self.comment})"
+        return f"{self.ln}:{self.__class__.__name__}({self.comment})"
 class CodePrint(Code):
     def __init__(self, line_number, expr):
         super().__init__(line_number)
         self.expr = expr
     def __str__(self):
-        return f"{self.ln}:Print({self.expr})"
+        return f"{self.ln}:{self.__class__.__name__}({self.expr})"
 
 class Expression:
     def __init__(self, expr):
         # TODO: this will be a tree or something later
         self.expr = expr
     def __str__(self):
-        return f"Expression({self.expr})"
+        return f"{self.__class__.__name__}({self.expr})"
     def __repr__(self):
-        return f"Expression({self.expr})"
+        return f"{self.__class__.__name__}({self.expr})"
 
     def get_value(self, vars_dict):
         if isinstance(self.expr, TokenStream.TokenNumber):
