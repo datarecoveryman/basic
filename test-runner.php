@@ -38,7 +38,9 @@ function run_test($program, $granular = true, $debug = false) {
     }
 
     # Give statements to Runner
-    $my_vars = [];
+    $my_vars = (object)[
+        //'foo' => 'bar',
+    ];
     $my_runner = new Runner($statements, $my_vars);
     if (true) {
         echo "Program lines in-order:\n";
@@ -61,6 +63,7 @@ function run_test($program, $granular = true, $debug = false) {
         }
         $keep_running = $my_runner->next();
     }
+    //print_r($my_runner);
     echo "Vars:"; print_r($my_vars);
     echo "\n";
 }

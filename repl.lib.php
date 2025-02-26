@@ -79,8 +79,8 @@ class Expression {
             return $this->expr->value;
         }
         if ($this->expr instanceof TokenSymbol) {
-            if (isset($vars_dict[$this->expr->value])) {
-                return $vars_dict[$this->expr->value];
+            if (isset($vars_dict->{$this->expr->value})) {
+                return $vars_dict->{$this->expr->value};
             }
             throw new Exception("Variable not found: " . $this->expr->value);
         }
@@ -290,6 +290,114 @@ class ParserFF {
             $newline = $this->_take_x_or_throw('newline', "Expected trailing newline");
         }
         return $code;
+    }
+}
+
+class Runner {
+    protected $_debug;
+    protected $_idx;
+    public $_lines;
+    public $_line_numbers;
+    protected $_statements;
+    public $vars_dict;
+
+    public function __construct(array $statements, stdClass $vars_dict, bool $debug = False) {
+        $this->_statements = $statements;
+        $this->vars_dict = $vars_dict;
+        $this->_debug = $debug;
+        # Given a list of statements, create a dictionary of line number -> statement
+        $this->lines = [];
+        foreach ($statements as $stmt) {
+            $this->lines[$stmt->line_number] = $stmt;
+        }
+        # Use line_numbers as a zero-based index into the lines dictionary
+        $this->_idx = 0;
+        $this->line_numbers = array_keys($this->lines);
+        sort($this->line_numbers);
+        $this->_debug_print("Runner: line_numbers", $this->line_numbers);
+    }
+
+    protected function _debug_print(string $label, $value) {
+        if ($this->_debug) {
+            echo "$label: ";
+            if (is_array($value)) {
+                print_r($value);
+            } else {
+                echo $value;
+            }
+            echo "\n";
+        }
+    }
+
+    protected function _peek() {
+        if ($this->_idx < 0 || $this->_idx >= count($this->line_numbers)) {
+            return false;
+        }
+        $ln = $this->line_numbers[$this->_idx];
+        return [$ln, $this->lines[$ln]];
+    }
+
+    public function next() {
+        $p = $this->_peek();
+        if ($p === false) {
+            $this->_debug_print("End of program.", '');
+            return false;
+        }
+        $ln = $p[0];
+        $stmt = $p[1];
+        $this->_debug_print("Execute line $ln", $stmt);
+        if ($stmt instanceof CodeAssignment) {
+            //print_r($stmt);
+            if ($stmt->expression instanceof Expression) {
+                $expr_value = $stmt->expression->get_value($this->vars_dict);
+                #print(f"Expression value: {expr_value}")
+                $this->vars_dict->{$stmt->variable} = $expr_value;
+            } else {
+                #print(f"Setting {$stmt.var} to literal {stmt.expr}")
+                $this->vars_dict->{$stmt->variable} = $stmt->expression->value;
+                $this->_debug_print("Assignment: set {$stmt->variable} to", $this->vars_dict->{$stmt->variable});
+            }
+            //print_r($this->vars_dict);
+        } elseif ($stmt instanceof CodeGoto) {
+            $this->_debug_print("GOTO", $stmt->target);
+            if ($stmt->target instanceof Token) {
+                #print("GOTO: getting value from token")
+                # If the target is a token, get its value
+                $target_ln = $stmt->target->value;
+            } else {
+                $target_ln = $stmt->target;
+            }
+            $index_of = function (array $items, $item) {
+                $ret = -1;
+                foreach ($items as $i => $v) {
+                    if ($v == $item) {
+                        $ret = $i;
+                        break;
+                    }
+                }
+                return $ret;
+            };
+            $new_idx = $index_of($this->line_numbers, $target_ln);
+            if ($new_idx < 0) {
+                echo "Line {$stmt->target} not found\n";
+                return False;
+            }
+            # if idx is going to be incremented later, can I just subtract 1 here?
+            $this->_idx = $new_idx - 1;
+        } elseif ($stmt instanceof CodeNoop) {
+            $this->_debug_print("REM Noop", '');
+        } elseif ($stmt instanceof CodePrint) {
+            if ($stmt->expression instanceof Expression) {
+                $expr_value = $stmt->expression->get_value($this->vars_dict);
+                echo "PRINT expression: ", $expr_value, "\n";
+            } else {
+                echo "PRINT literal ", $stmt->expression, ": ", $stmt->expression->value, "\n";
+            }
+        } else {
+            echo "Unknown statement type:", $stmt, "\n";
+        }
+        $this->_idx += 1;
+        return True; # Keep running
     }
 }
 
