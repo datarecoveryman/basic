@@ -510,7 +510,7 @@ class TokenStreamSkippy {
     }
 
     public function remaining() {
-        throw new Exception('TODO: Find what uses this.');
+        // Called by all non-debugging code; e.g. the tests.
         $tokens = [];
         $token = $this->next();
         while ($token) {
